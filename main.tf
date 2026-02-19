@@ -13,6 +13,8 @@ resource "aws_subnet" "my-subnet" {
 
   tags = {
     Name = "my-subnet"
+    "kubernetes.io/cluster/sai-eks-cluster"  = "shared"
+    "kubernetes.io/role/elb"                 = "1"
   }
 }
 resource "aws_subnet" "my-subnet-02" {
@@ -23,6 +25,8 @@ resource "aws_subnet" "my-subnet-02" {
 
   tags = {
     Name = "my-subnet-02"
+    "kubernetes.io/cluster/sai-eks-cluster"  = "shared"
+    "kubernetes.io/role/elb"                 = "1"
   }
 }
 resource "aws_internet_gateway" "my-gateway" {
@@ -157,6 +161,59 @@ resource "aws_instance" "jenkins-agent" {
   tags = {
     Name = "jenkins-agent"
   }
+}
+resource "aws_subnet" "private_subnet_1" {
+  vpc_id                  = aws_vpc.my-vpc.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = "ap-south-1a"
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "private-subnet-1"
+  }
+}
+
+resource "aws_subnet" "private_subnet_2" {
+  vpc_id                  = aws_vpc.my-vpc.id
+  cidr_block              = "10.0.4.0/24"
+  availability_zone       = "ap-south-1b"
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "private-subnet-2"
+  }
+}
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
+}
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.my-subnet.id  # your public subnet
+
+  tags = {
+    Name = "nat-gateway"
+  }
+}
+resource "aws_route_table" "private_rt" {
+  vpc_id = aws_vpc.my-vpc.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat.id
+  }
+
+  tags = {
+    Name = "private-route-table"
+  }
+}
+resource "aws_route_table_association" "private_assoc_1" {
+  subnet_id      = aws_subnet.private_subnet_1.id
+  route_table_id = aws_route_table.private_rt.id
+}
+
+resource "aws_route_table_association" "private_assoc_2" {
+  subnet_id      = aws_subnet.private_subnet_2.id
+  route_table_id = aws_route_table.private_rt.id
 }
 
 
